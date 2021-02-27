@@ -4,6 +4,8 @@
 
 #include <armadillo>
 
+#define ARMA_NO_DEBUG
+
 using namespace arma;
 using namespace std;
 
@@ -106,40 +108,75 @@ int main()
         labelFile.close();
     }
 
-    //switch images
+    // convert labels to One Hot enconding
+    mat oneHot(10, labels.n_elem, fill::zeros);
+    for (int i = 0; i < labels.n_elem; ++i)
+    {
+        int index = labels(i);
+        oneHot(index, i) = 1;
+    }
+
+    // switch images matrix
     images = images.t();
 
     // set weights for each layer
-    int neuronAmount = 2;
-    mat weightsL0to1(neuronAmount, images.n_rows, fill::randu);
+    int neuronAmountL1 = 1000;
+    mat weightsL0to1(neuronAmountL1, images.n_rows, fill::randu);
     weightsL0to1 /= 100;
-    mat weightsL1to2(1, neuronAmount, fill::randu);
+    int neuronAmountL2 = 10;
+    mat weightsL1to2(neuronAmountL2, neuronAmountL1, fill::randu);
     weightsL1to2 /= 100;
+    double learnRate = 0.001;
 
     // set batches
-    int batchSize = 2;
-    mat miniBatch = images.cols(0, batchSize - 1);
-    mat batchLabels = labels.subvec(0, batchSize - 1);
+    int batchSize = 10;
 
-    // feed-forward
-    mat activationL1 = weightsL0to1 * miniBatch;
-    mat activationL1Gradient = activationL1;
-    activationL1.transform([](double val) { return sig(val); });
-    activationL1Gradient.transform([](double val) { return sig(val) * (1 - sig(val)); });
-    mat activationL2 = weightsL1to2 * activationL1;
-    mat activationL2Gradient = activationL2;
-    activationL2.transform([](double val) { return sig(val); });
-    activationL2Gradient.transform([](double val) { return sig(val) * (1 - sig(val)); });
-    mat cost = (activationL2 - batchLabels) * 2;
+    int correct = 0;
+    int wrong = 0;
+    for (int epoch = 0; epoch < 1; epoch++)
+    {
+        for (int i = 0; i < images.n_cols; i += batchSize)
+        {
+            mat miniBatch = images.cols(i, i + batchSize - 1);
+            mat batchLabels = oneHot.cols(i, i + batchSize - 1);
 
-    miniBatch.brief_print("miniBatch:");
-    weightsL0to1.brief_print("weights layer 0 to 1:");
-    activationL1.brief_print("activationL1:");
-    weightsL1to2.brief_print("weights layer 1 to 2:");
-    activationL2.brief_print("activationL2:");
-    batchLabels.brief_print("batchLabels:");
-    cost.brief_print("cost:");
+            // feed-forward
+            mat activationL1 = weightsL0to1 * miniBatch;
+            mat activationL1Gradient = activationL1;
+            activationL1.transform([](double val) { return val; });
+            activationL1Gradient.transform([](double val) { return 1; });
+            mat activationL2 = weightsL1to2 * activationL1;
+            mat activationL2Gradient = activationL2;
+            activationL2.transform([](double val) { return val; });
+            activationL2Gradient.transform([](double val) { return 1; });
 
-    // get error
+            //backpropagation
 
+            //determine error % activationGradient of each layer
+            mat errorL2 = ((activationL2 - batchLabels) * 2) % activationL2Gradient;
+            mat errorL1 = (weightsL1to2.t() * errorL2) % activationL1Gradient;
+
+            // update weights
+            weightsL1to2 -= learnRate * ((errorL2 * activationL1.t()) / batchSize);
+            weightsL0to1 -= learnRate * ((errorL1 * miniBatch.t()) / batchSize);
+
+            // check results and print to console
+            for (int i = 0; i < batchSize; i++)
+            {
+                vec a = activationL2.col(i);
+                vec b = batchLabels.col(i);
+                if (index_max(a) == index_max(b))
+                {
+                    ++correct;
+                }
+                else
+                {
+                    ++wrong;
+                }
+            }
+            cout << "correct: " << correct << " | ";
+            cout << "wrong: " << wrong << " | ";
+            cout << "success rate: " << ((double)correct / (correct + wrong)) * 100 << "%" << endl;
+        }
+    }
 }
