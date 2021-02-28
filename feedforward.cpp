@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <iomanip>
 
 #include <armadillo>
 
@@ -46,7 +47,7 @@ double sig(double t)
 
 int main()
 {
-    arma_rng::set_seed(10);
+    arma_rng::set_seed(7);
     // get the data of the image file from the mnist dataset
     mat images;
     ifstream imageFile("mnistData/train-images-idx3-ubyte", std::ios::binary);
@@ -126,15 +127,32 @@ int main()
     int neuronAmountL2 = 10;
     mat weightsL1to2(neuronAmountL2, neuronAmountL1, fill::randu);
     weightsL1to2 /= 100;
-    double learnRate = 0.001;
+    double learnRate = 0.02;
 
     // set batches
-    int batchSize = 10;
+    int batchSize = 100;
 
-    int correct = 0;
-    int wrong = 0;
-    for (int epoch = 0; epoch < 1; epoch++)
+    int epochAmount = 10;
+
+    colvec errorsEpoch(epochAmount, fill::zeros);
+
+    std::uniform_int_distribution<int> unif(0, images.n_cols - 1);
+    std::default_random_engine re;
+
+    for (int epoch = 0; epoch < epochAmount; epoch++)
     {
+        double error = 0;
+        int correct = 0;
+        int wrong = 0;
+        colvec errors(images.n_cols, fill::zeros);
+
+        for (int j = 0; j < 60000; j++)
+        {
+            int colOne = unif(re);
+            int colTwo = unif(re);
+            images.swap_cols(colOne, colTwo);
+            oneHot.swap_cols(colOne, colTwo);
+        }
         for (int i = 0; i < images.n_cols; i += batchSize)
         {
             mat miniBatch = images.cols(i, i + batchSize - 1);
@@ -161,6 +179,14 @@ int main()
             weightsL0to1 -= learnRate * ((errorL1 * miniBatch.t()) / batchSize);
 
             // check results and print to console
+            error = mean(mean(activationL2 - batchLabels, 0));
+            if (error >= 1)
+            {
+                cout << "error is equal/over 1!!!" << endl;
+                return 0;
+            }
+            errors(i) = error;
+
             for (int i = 0; i < batchSize; i++)
             {
                 vec a = activationL2.col(i);
@@ -174,9 +200,19 @@ int main()
                     ++wrong;
                 }
             }
+            cout << "epoch: " << epoch + 1 << " | ";
             cout << "correct: " << correct << " | ";
             cout << "wrong: " << wrong << " | ";
-            cout << "success rate: " << ((double)correct / (correct + wrong)) * 100 << "%" << endl;
+            std::cout << std::fixed;
+            std::cout << std::setprecision(4);
+            cout << "success rate: " << ((double)correct / (correct + wrong)) * 100 << "% | ";
+            std::cout << std::setprecision(10);
+            cout << "error: " << error << endl;
+            std::cout << std::defaultfloat;
         }
+
+        errorsEpoch(epoch) = mean(errors);
     }
+
+    errorsEpoch.print("errors of each epoch:");
 }
