@@ -122,17 +122,17 @@ int main()
 
     // set weights for each layer
     int neuronAmountL1 = 100;
-    mat weightsL0to1(neuronAmountL1, images.n_rows, fill::randu);
-    weightsL0to1 /= 100;
+    mat weightsL0to1(neuronAmountL1, images.n_rows, fill::randn);
+    weightsL0to1 /= 10;
     int neuronAmountL2 = 10; // must be 10 to work
-    mat weightsL1to2(neuronAmountL2, neuronAmountL1, fill::randu);
-    weightsL1to2 /= 100;
+    mat weightsL1to2(neuronAmountL2, neuronAmountL1, fill::randn);
+    weightsL1to2 /= 10;
     double learnRate = 0.02;
 
     // set batches
     int batchSize = 100;
 
-    int epochAmount = 5;
+    int epochAmount = 500;
 
     colvec errorsEpoch(epochAmount, fill::zeros);
 
@@ -161,12 +161,15 @@ int main()
             // feed-forward
             mat activationL1 = weightsL0to1 * miniBatch;
             mat activationL1Gradient = activationL1;
-            activationL1.transform([](double val) { return val /*sig(val)*/; });
-            activationL1Gradient.transform([](double val) { return 1 /*sig(val) * (1 - sig(val))*/; });
+            activationL1.transform([](double val) { return sig(val); });
+            activationL1Gradient.transform([](double val) { return sig(val) * (1 - sig(val)); });
             mat activationL2 = weightsL1to2 * activationL1;
             mat activationL2Gradient = activationL2;
-            activationL2.transform([](double val) { return val /*sig(val)*/; });
-            activationL2Gradient.transform([](double val) { return 1 /*sig(val) * (1 - sig(val))*/; });
+            activationL2.transform([](double val) { return sig(val); });
+            activationL2Gradient.transform([](double val) { return sig(val) * (1 - sig(val)); });
+
+            // weightsL0to1.brief_print("weightsL0to1:");
+            // weightsL1to2.brief_print("weightsL1to2:");
 
             //backpropagation
 
@@ -175,16 +178,17 @@ int main()
             mat errorL1 = (weightsL1to2.t() * errorL2) % activationL1Gradient;
 
             // update weights
-            mat L1to2_change = learnRate * ((errorL2 * activationL1.t()) / batchSize);
+            mat L1to2_change = learnRate * (errorL2 * activationL1.t());
             weightsL1to2 -= L1to2_change;
-            mat L0to1_change = learnRate * ((errorL1 * miniBatch.t()) / batchSize);
+            mat L0to1_change = learnRate * (errorL1 * miniBatch.t());
             weightsL0to1 -= L0to1_change;
 
+            // miniBatch.brief_print("input:");
             // L1to2_change.brief_print("L1to2_change:");
             // // L0to1_change.brief_print("L0to1_change:");
-            // activationL2.col(i).brief_print("activationL2:");
-            // batchLabels.col(i).brief_print("batchLabels:");
-            // // activationL1.col(i).brief_print("activationL1:");
+            // activationL2.col(0).brief_print("activationL2:");
+            // batchLabels.col(0).brief_print("batchLabels:");
+            // activationL1.col(0).brief_print("activationL1:");
 
             // check results and print to console
             error = mean(mean(activationL2 - batchLabels, 0));
